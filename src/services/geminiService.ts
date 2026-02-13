@@ -7,7 +7,39 @@ interface FeedbackResponse {
   suggestions: string;
 }
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
+
+const callGroqAPI = async (prompt: string, apiKey: string, temperature: number = 0.7): Promise<string> => {
+  const response = await fetch(GROQ_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature,
+      max_tokens: 1024,
+      top_p: 0.95,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error('API Error Details:', errorData);
+    throw new Error(`API request failed: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+  }
+
+  const data = await response.json();
+  return data.choices[0].message.content.trim();
+};
 
 export const generateQuestion = async (
   category: string,
@@ -91,38 +123,7 @@ export const generateQuestion = async (
   }
 
   try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: fullPrompt
-              }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.8, // Increased for more variety
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 1024,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('API Error Details:', errorData);
-      throw new Error(`API request failed: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
-    }
-
-    const data = await response.json();
-    return data.candidates[0].content.parts[0].text.trim();
+    return await callGroqAPI(fullPrompt, apiKey, 0.8);
   } catch (error) {
     console.error('Error generating question:', error);
     throw new Error('Failed to generate question. Please check your API key and try again.');
@@ -198,38 +199,7 @@ export const evaluateAnswer = async (
   }
 
   try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt
-              }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.3,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 1024,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('API Error Details:', errorData);
-      throw new Error(`API request failed: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
-    }
-
-    const data = await response.json();
-    const responseText = data.candidates[0].content.parts[0].text.trim();
+    const responseText = await callGroqAPI(prompt, apiKey, 0.3);
 
     // Extract JSON from response
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);

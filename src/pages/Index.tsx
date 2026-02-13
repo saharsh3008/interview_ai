@@ -60,7 +60,7 @@ const Index = () => {
 
   const MAX_QUESTIONS_PER_CATEGORY = 5;
   // API Key from environment variables
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+  const apiKey = import.meta.env.VITE_GROQ_API_KEY || "";
 
   const categories = [
     { value: "technical", label: "Technical Interview", icon: "💻" },

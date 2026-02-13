@@ -9,8 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { FileText, Upload, Check, AlertCircle, X, Trash2 } from "lucide-react";
 import * as pdfjsLib from "pdfjs-dist";
 
-// Set worker source for PDF.js - using unpkg for better version alignment
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+// Set worker source for PDF.js v5 - uses .mjs worker files
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 interface ContextSetupProps {
     onContextUpdate: (context: { resumeText?: string; jobDescription?: string }) => void;
