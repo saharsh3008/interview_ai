@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Brain, Target, User, LogOut, BarChart3, Mic, Sparkles, ArrowRight, Code2 } from "lucide-react";
+import { Loader2, Brain, Target, User, LogOut, BarChart3, Mic, Sparkles, ArrowRight, Code2, FileSearch } from "lucide-react";
 import { toast } from "sonner";
-import { generateQuestion, evaluateAnswer } from "@/services/geminiService";
+import { generateQuestion, evaluateAnswer, analyzeResumeVsJD, ResumeAnalysis } from "@/services/geminiService";
 import { voiceService } from "@/services/voiceService";
 import LoginPage from "@/components/LoginPage";
 import SessionResults from "@/components/SessionResults";
@@ -15,6 +15,7 @@ import VoiceAnswerInput from "@/components/VoiceAnswerInput";
 import Dashboard from "@/components/Dashboard";
 import ContextSetup from "@/components/ContextSetup";
 import CodeWorkspace from "@/components/CodeWorkspace";
+import ResumeReport from "@/components/ResumeReport";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface QuestionResult {
@@ -58,6 +59,11 @@ const Index = () => {
   const [interimTranscript, setInterimTranscript] = useState("");
   const [voiceSupported, setVoiceSupported] = useState(false);
 
+  // Resume analysis states
+  const [resumeAnalysis, setResumeAnalysis] = useState<ResumeAnalysis | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+
   const MAX_QUESTIONS_PER_CATEGORY = 5;
   // API Key from environment variables
   const apiKey = import.meta.env.VITE_GROQ_API_KEY || "";
@@ -66,6 +72,7 @@ const Index = () => {
     { value: "technical", label: "Technical Interview", icon: "💻" },
     { value: "behavioral", label: "Behavioral Interview", icon: "🤝" },
     { value: "system-design", label: "System Design", icon: "🏗️" },
+    { value: "coding", label: "Coding Challenge", icon: "⌨️" },
     { value: "leadership", label: "Leadership", icon: "👑" },
     { value: "product", label: "Product Management", icon: "📱" }
   ];
@@ -457,6 +464,40 @@ const Index = () => {
                 initialContext={{ resumeText, jobDescription }}
               />
 
+              {/* Resume Analysis Button */}
+              {resumeText && jobDescription && (
+                <Button
+                  onClick={async () => {
+                    setIsAnalyzing(true);
+                    try {
+                      const analysis = await analyzeResumeVsJD(resumeText, jobDescription, apiKey);
+                      setResumeAnalysis(analysis);
+                      setShowReport(true);
+                      toast.success("Resume analysis complete!");
+                    } catch (error) {
+                      toast.error("Failed to analyze resume. Please try again.");
+                      console.error(error);
+                    } finally {
+                      setIsAnalyzing(false);
+                    }
+                  }}
+                  disabled={isAnalyzing}
+                  className="w-full h-12 text-base font-semibold bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 shadow-lg shadow-violet-500/20 rounded-xl transition-all duration-300"
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Analyzing Resume...
+                    </>
+                  ) : (
+                    <>
+                      <FileSearch className="mr-2 h-5 w-5" />
+                      Analyze Resume vs JD
+                    </>
+                  )}
+                </Button>
+              )}
+
               {/* Category Selection Card */}
               <Card className="glass-card overflow-hidden">
                 <CardHeader className="bg-white/5 border-b border-white/5 pb-4">
@@ -469,7 +510,7 @@ const Index = () => {
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-slate-400">Review Category</label>
-                      <Select value={selectedCategory} onValueChange={setSelectedCategory} disabled={questionCount > 0}>
+                      <Select value={selectedCategory} onValueChange={(val) => { setSelectedCategory(val); if (val === 'coding') setAnswerMode('code'); }} disabled={questionCount > 0}>
                         <SelectTrigger className="glass-input h-12 text-white border-white/10 bg-black/20 focus:ring-purple-500/50">
                           <SelectValue placeholder="Select Focus Area" />
                         </SelectTrigger>
@@ -689,6 +730,14 @@ const Index = () => {
           </div>
         )}
       </div>
+
+      {/* Resume Analysis Report Modal */}
+      {showReport && resumeAnalysis && (
+        <ResumeReport
+          analysis={resumeAnalysis}
+          onClose={() => setShowReport(false)}
+        />
+      )}
     </div>
   );
 };

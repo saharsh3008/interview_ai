@@ -1,10 +1,24 @@
-
 interface FeedbackResponse {
   score: number;
   overall: string;
   strengths: string;
   improvements: string;
   suggestions: string;
+}
+
+export interface ResumeAnalysis {
+  matchScore: number;
+  verdict: string;
+  matchingSkills: string[];
+  missingSkills: string[];
+  experienceGaps: string[];
+  keywordAnalysis: {
+    found: string[];
+    missing: string[];
+  };
+  strengths: string[];
+  recommendations: string[];
+  summary: string;
 }
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -82,6 +96,13 @@ export const generateQuestion = async (
       "Create a scenario about launching a new product feature, including go-to-market strategy and success metrics.",
       "Ask about competitive analysis and positioning a product in a crowded market.",
       "Generate a question about working with engineering teams to balance technical debt and feature development."
+    ],
+    coding: [
+      "Generate a coding problem involving arrays or strings. Example topics: two sum, sliding window, string manipulation, subarray problems. The problem should require writing a function with clearly defined input/output.",
+      "Generate a coding problem about linked lists or stacks/queues. Example topics: reverse a linked list, detect cycle, implement a queue using stacks, balanced parentheses. The problem should require writing a function with clearly defined input/output.",
+      "Generate a coding problem about binary trees or binary search trees. Example topics: tree traversal, lowest common ancestor, validate BST, maximum depth. The problem should require writing a function with clearly defined input/output.",
+      "Generate a coding problem involving dynamic programming or recursion. Example topics: fibonacci variants, coin change, longest subsequence, knapsack problems. The problem should require writing a function with clearly defined input/output.",
+      "Generate a coding problem about graphs, sorting, or searching. Example topics: BFS/DFS traversal, topological sort, binary search variants, merge intervals. The problem should require writing a function with clearly defined input/output."
     ]
   };
 
@@ -110,16 +131,35 @@ export const generateQuestion = async (
     - Return ONLY the question text.`;
   } else {
     // Fallback to generic prompt if no context
-    fullPrompt = `${selectedPrompt}
+    if (category === 'coding') {
+      fullPrompt = `${selectedPrompt}
   
-    Requirements for Question #${questionNumber}:
-    - Make it specific, realistic, and different from typical interview questions
-    - Suitable for mid to senior level positions  
-    - Should take 3-5 minutes to answer properly
-    - Include context or scenario if needed
-    - Ensure this question is unique and varied from previous questions
-    - Add specific details that make it engaging and memorable
-    - Return only the question, no additional text or formatting.`;
+      Requirements for Question #${questionNumber}:
+      - Present a clear coding problem with a function signature
+      - Include 2-3 example test cases with input and expected output
+      - Specify constraints (e.g., array length, value ranges)
+      - Difficulty: Medium (like LeetCode medium)
+      - The candidate should be able to solve it in 15-20 minutes
+      - Ensure this question is unique and varied from previous questions
+      - Format:
+        **Problem:** [description]
+        **Function:** [function name and parameters]
+        **Examples:**
+        Input: ...
+        Output: ...
+      - Return only the problem statement, no solution.`;
+    } else {
+      fullPrompt = `${selectedPrompt}
+  
+      Requirements for Question #${questionNumber}:
+      - Make it specific, realistic, and different from typical interview questions
+      - Suitable for mid to senior level positions  
+      - Should take 3-5 minutes to answer properly
+      - Include context or scenario if needed
+      - Ensure this question is unique and varied from previous questions
+      - Add specific details that make it engaging and memorable
+      - Return only the question, no additional text or formatting.`;
+    }
   }
 
   try {
@@ -211,5 +251,60 @@ export const evaluateAnswer = async (
   } catch (error) {
     console.error('Error evaluating answer:', error);
     throw new Error('Failed to evaluate answer. Please check your API key and try again.');
+  }
+};
+
+export const analyzeResumeVsJD = async (
+  resumeText: string,
+  jobDescription: string,
+  apiKey: string
+): Promise<ResumeAnalysis> => {
+  const prompt = `You are an expert ATS (Applicant Tracking System) and career advisor. Analyze the following resume against the job description and provide a detailed compatibility report.
+
+RESUME:
+${resumeText}
+
+JOB DESCRIPTION:
+${jobDescription}
+
+Provide your analysis in the following JSON format ONLY (no additional text):
+
+{
+  "matchScore": [number from 0-100 representing overall match percentage],
+  "verdict": "[Strong Match / Good Match / Moderate Match / Weak Match / Poor Match]",
+  "matchingSkills": ["skill1", "skill2", "skill3"],
+  "missingSkills": ["skill1", "skill2", "skill3"],
+  "experienceGaps": ["gap1", "gap2"],
+  "keywordAnalysis": {
+    "found": ["keyword1", "keyword2"],
+    "missing": ["keyword1", "keyword2"]
+  },
+  "strengths": ["strength1", "strength2", "strength3"],
+  "recommendations": ["recommendation1", "recommendation2", "recommendation3"],
+  "summary": "A 2-3 sentence overall summary of the candidate's fit for this role."
+}
+
+Guidelines:
+- Be thorough and specific in identifying matching and missing skills
+- Consider both hard skills (technologies, tools) and soft skills
+- Look for relevant experience, certifications, and education alignment
+- Identify ATS-friendly keywords present and missing
+- Provide actionable recommendations for improving the resume
+- Be honest but constructive in the assessment
+
+Return ONLY the JSON object, no additional text.`;
+
+  try {
+    const responseText = await callGroqAPI(prompt, apiKey, 0.3);
+
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Invalid response format');
+    }
+
+    return JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    console.error('Error analyzing resume:', error);
+    throw new Error('Failed to analyze resume. Please check your API key and try again.');
   }
 };
